@@ -1,0 +1,8 @@
+project/
+│── README.md
+│── your_script.ipynb
+│── data/
+│    ├── example.wav
+│    ├── example.TextGrid
+│── output/
+     ├── extracted_features.csv
