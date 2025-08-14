@@ -1,0 +1,118 @@
+# Corrected function: uses full-sound formant model & absolute times
+def extract_formant_and_features(sound, start, end, n_points=20):
+    # Compute formant model for entire audio
+    formant = sound.to_formant_burg(time_step=0.002, max_number_of_formants=5, maximum_formant=5500)
+
+    # Initialize placeholders
+    F1, F2, F3 = [np.nan] * n_points, [np.nan] * n_points, [np.nan] * n_points
+    f0_mean, intensity_mean = np.nan, np.nan
+
+    try:
+        # Absolute times for sampling
+        times = np.linspace(start, end, n_points)
+
+        for i, t in enumerate(times):
+            F1[i] = formant.get_value_at_time(1, t)
+            F2[i] = formant.get_value_at_time(2, t)
+            F3[i] = formant.get_value_at_time(3, t)
+
+        # Extract pitch and intensity from segment
+        segment = sound.extract_part(from_time=start, to_time=end)
+
+        # Pitch (F0)
+        pitch = segment.to_pitch()
+        f0_values = pitch.selected_array['frequency']
+        f0_mean = np.nanmean(f0_values[f0_values > 0]) if len(f0_values[f0_values > 0]) > 0 else np.nan
+
+        # Intensity
+        intensity = segment.to_intensity()
+        intensity_mean = np.mean(intensity.values) if intensity.values.size > 0 else np.nan
+
+    except Exception as e:
+        print(f"Feature extraction failed for {start:.2f}-{end:.2f}: {e}")
+
+    return F1, F2, F3, f0_mean, intensity_mean
+
+
+# Vowel set for filtering
+vowels = {"i", "ɪ", "e", "eɪ", "ɛ", "æ", "a", "ɑ", "ɐ", "ʌ", "ə", "ɚ", "ɝ", "o", "oʊ", "ɔ", "u", "ʊ", "aj", "aʊ", "ɔɪ", "ɪɚ", "iː", "uː", "ɜ", "ɜː"}
+
+rows = []
+
+# Process all WAV files in current folder
+for audio_file in glob.glob("*.wav"):
+    base_name = os.path.splitext(os.path.basename(audio_file))[0]
+    tg_file = base_name + ".TextGrid"
+
+    if not os.path.exists(tg_file):
+        print(f"Skipping {base_name} (TextGrid not found)")
+        continue
+
+    print(f"Processing {base_name}...")
+
+    # Load sound and TextGrid
+    sound = parselmouth.Sound(audio_file)
+    tg = TextGrid.fromFile(tg_file)
+
+    # Get tiers
+    word_tier, phone_tier = None, None
+    for tier in tg.tiers:
+        if tier.name.lower() == 'words':  # assuming TextGrid uses 'words'
+            word_tier = tier
+        elif tier.name.lower() == 'phones':  # assuming TextGrid uses 'phones'
+            phone_tier = tier
+
+    if not word_tier:
+        print(f"Skipping {base_name}: 'words' tier not found.")
+        continue
+    if not phone_tier:
+        print(f"Skipping {base_name}: 'phones' tier not found.")
+        continue
+
+    # Loop through phone intervals
+    for phone in phone_tier.intervals:
+        phone_label = phone.mark.strip()
+        duration = phone.maxTime - phone.minTime
+
+        # Skip very short vowels (<64 ms)
+        if duration < 0.064:
+            continue
+
+        if phone_label and any(v in phone_label for v in vowels):
+            # Find containing word
+            word_label = None
+            for word in word_tier.intervals:
+                if word.minTime <= phone.minTime and word.maxTime >= phone.maxTime:
+                    word_label = word.mark.strip()
+                    break
+
+            # Extract acoustic features
+            F1_track, F2_track, F3_track, f0_mean, intensity_mean = extract_formant_and_features(
+                sound, phone.minTime, phone.maxTime, n_points=20
+            )
+
+            row = {
+                "file": base_name,
+                "words": word_label,
+                "phones": phone_label,
+                "start_time": phone.minTime,
+                "end_time": phone.maxTime,
+                "duration": duration,
+                "F0_mean": f0_mean,
+                "Intensity_mean": intensity_mean
+            }
+
+            # Add 30-point tracks
+            for i in range(20):
+                row[f"F1_{i+1}"] = F1_track[i]
+                row[f"F2_{i+1}"] = F2_track[i]
+                row[f"F3_{i+1}"] = F3_track[i]
+
+            rows.append(row)
+
+# Combine into DataFrame
+df = pd.DataFrame(rows)
+print(f"Extracted {len(df)} vowel tokens.")
+output_file = "all_vowel_formant_tracks_20points_with_features.csv"
+df.to_csv(output_file, index=False)
+print(f"Saved as {output_file}")
