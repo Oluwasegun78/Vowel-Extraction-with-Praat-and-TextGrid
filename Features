@@ -1,0 +1,7 @@
+Works seamlessly in Google Colab.
+
+Extracts vowel formants (F1, F2, F3 at 20 points), duration, and other acoustic features from .wav + .TextGrid.
+
+Uses Praat-Parselmouth for acoustic analysis.
+
+Outputs results as CSV for further statistical analysis.
