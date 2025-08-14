@@ -34,7 +34,7 @@ def extract_formant_and_features(sound, start, end, n_points=20):
     return F1, F2, F3, f0_mean, intensity_mean
 
 
-# Vowel set for filtering
+# Vowels to extract, you can change this to the annotations in your phone tier
 vowels = {"i", "ɪ", "e", "eɪ", "ɛ", "æ", "a", "ɑ", "ɐ", "ʌ", "ə", "ɚ", "ɝ", "o", "oʊ", "ɔ", "u", "ʊ", "aj", "aʊ", "ɔɪ", "ɪɚ", "iː", "uː", "ɜ", "ɜː"}
 
 rows = []
@@ -102,7 +102,7 @@ for audio_file in glob.glob("*.wav"):
                 "Intensity_mean": intensity_mean
             }
 
-            # Add 30-point tracks
+            # Add 20-point tracks
             for i in range(20):
                 row[f"F1_{i+1}"] = F1_track[i]
                 row[f"F2_{i+1}"] = F2_track[i]
@@ -116,3 +116,11 @@ print(f"Extracted {len(df)} vowel tokens.")
 output_file = "all_vowel_formant_tracks_20points_with_features.csv"
 df.to_csv(output_file, index=False)
 print(f"Saved as {output_file}")
+
+
+#download the csv file
+# save then trigger a browser download
+accent_vowel.to_csv("df.csv", index=False)
+
+from google.colab import files
+files.download("df.csv")
