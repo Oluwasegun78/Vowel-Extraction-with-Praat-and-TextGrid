@@ -1,2 +1,13 @@
 !pip install praat-parselmouth textgrid pandas numpy
 !pip install -U praat-parselmouth
+
+after uploading the audio and the text files, load the following packages
+
+import parselmouth
+import textgrid
+import parselmouth
+from textgrid import TextGrid
+import pandas as pd
+import numpy as np
+import os
+import glob
